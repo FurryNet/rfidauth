@@ -3,12 +3,20 @@
 #include <freertos/task.h>
 #include <driver/i2c.h>
 #include <esp_log.h>
+#include <reader.h>
+#include "driver/spi_master.h"
 
 #define sda_pin 6
 #define scl_pin 7
 #define frequency 400000
 
 void i2c_setup();
+
+void cb_func(void*arg) {
+    display_text("Card Detected!");
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+    display_clear();
+}
 
 extern "C" {
     void app_main() {
@@ -21,6 +29,13 @@ extern "C" {
         display_clear();
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         display_text("Goodbye, World!");
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        display_clear();
+        reader_init();
+        reader_irq_handler(cb_func);
+        while(true) {
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+        }
     }
 }
 
