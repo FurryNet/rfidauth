@@ -13,6 +13,7 @@
 #define TAG "display"
 
 SSD1306_t dev;
+QueueHandle_t writePageQueue = xQueueCreate(32, sizeof(displayQueue_t));
 
 // Initalize the display pins
 void display_clear();
@@ -26,8 +27,9 @@ void display_init()
 	xTaskCreate(display_write_queue, "display_write_queue", configMINIMAL_STACK_SIZE-512, NULL, 5, NULL);
 }
 
-// Clean the diasplay
+// Clean the display
 void display_clear() {
+	xQueueReset(writePageQueue);
 	ssd1306_clear_screen(&dev, false);
 }
 
@@ -38,7 +40,6 @@ void display_text(const char* text) {
 }
 
 // Write text to a specific line on the display (isCenter is used to center the text on the line)
-QueueHandle_t writePageQueue = xQueueCreate(32, sizeof(displayQueue_t));
 void display_write_page(const char* text, int page, bool isCenter) {
 	// Get the length and allocate the space
 	size_t text_len = strlen(text); // Each line only supports 16 characters
