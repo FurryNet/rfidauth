@@ -5,15 +5,21 @@
 #include <esp_log.h>
 #include <reader.h>
 #include "driver/spi_master.h"
+#include <string.h>
 
 #define sda_pin 6
 #define scl_pin 7
+#define miso_pin 2
+#define mosi_pin 10
+#define sck_pin 11
 #define frequency 400000
 
 void i2c_setup();
+void spi_setup();
+
 
 void cb_func(void*arg) {
-    display_text("Card Detected!");
+    display_write_page("Card Detected!", 3);
     vTaskDelay(5000 / portTICK_PERIOD_MS);
     display_clear();
 }
@@ -23,17 +29,26 @@ extern "C" {
         ESP_LOGI("SYS", "Loading Components...");
         i2c_setup();
         display_init();
-        ESP_LOGI("SYS", "Starting Script...");
-        display_text("Hello, World!");
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        display_clear();
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        display_text("Goodbye, World!");
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
-        display_clear();
+        spi_setup();
         reader_init();
         reader_irq_handler(cb_func);
-        while(true) {
+
+        ESP_LOGI("SYS", "Starting Script...");
+        display_write_page("DEV Ver: ", 0);
+
+        uint8_t verDat = 0;
+        reader_read_reg_read(RC522_VERSION_REG, &verDat);
+        uint8_t ver = (verDat & 0x03);
+        uint8_t chipSet = (verDat >> 4) & 0x07;
+        char verstr[4];
+        char chipstr[4];
+        sprintf(verstr, "%hhu", ver);
+        sprintf(chipstr, "%hhu", chipSet);
+        display_write_page(verstr, 1);
+        display_write_page(chipstr, 2);
+        
+        
+        while(1) {
             vTaskDelay(1000 / portTICK_PERIOD_MS);
         }
     }
@@ -51,7 +66,26 @@ void i2c_setup() {
     conf.clk_flags = 0;
     i2c_param_config(I2C_NUM_0, &conf);
     if(i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0) == ESP_OK)
-        ESP_LOGI("I2C_Setup", "hdc2080 driver installed successfully");
+        ESP_LOGI("I2C_Setup", "i2c driver installed successfully");
     else
-        ESP_LOGE("I2C_Setup", "hdc2080 driver failed to install");
+        ESP_LOGE("I2C_Setup", "i2c driver failed to install");
+}
+
+// Initialize the SPI bus
+spi_host_device_t spi_host;
+void spi_setup() {
+    spi_bus_config_t conf;
+    memset(&conf, 0, sizeof(conf));
+    conf.miso_io_num = miso_pin;
+    conf.mosi_io_num = mosi_pin;
+    conf.sclk_io_num = sck_pin;
+    conf.quadwp_io_num = 20;
+    conf.quadhd_io_num = 21;
+    conf.flags = 0;
+    conf.max_transfer_sz = SOC_SPI_MAXIMUM_BUFFER_SIZE;
+    esp_err_t ret;
+    if((ret = spi_bus_initialize(SPI2_HOST, &conf, SPI_DMA_DISABLED)) == ESP_OK)
+        ESP_LOGI("SPI_Setup", "SPI bus initialized successfully");
+    else
+        ESP_LOGE("SPI_Setup", "SPI bus failed to initialize: %d", ret);
 }
