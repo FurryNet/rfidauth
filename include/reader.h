@@ -20,7 +20,7 @@
 
 
 // Initialize the RC522 reader
-void reader_init();
+void reader_init(void(*cb)(void*arg));
 
 // Read the UID of a card
 void reader_read_uid(char* uid);

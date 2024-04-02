@@ -9,6 +9,7 @@
 #define sda_pin 6
 #define scl_pin 7
 #define cs_pin 4
+#define reset_pin GPIO_NUM_3
 #define irq_pin GPIO_NUM_5 // Interrupt pin when card is detected
 #define TAG "RC522"
 
@@ -28,7 +29,7 @@ esp_err_t  rc522_set_bitmask(uint8_t addr, uint8_t mask)
 }
 
 
-void reader_init() {
+void reader_init(void(*cb)(void*arg)) {
     // Setup Device interface
     spi_device_interface_config_t devcfg = {
         .mode = 0,
@@ -39,6 +40,13 @@ void reader_init() {
     if(spi_bus_add_device(SPI2_HOST, &devcfg, &spi_handle) != ESP_OK)
         ESP_LOGI(TAG, "Failed to add spi bus device");
 
+    // Reset the device
+    gpio_set_direction(reset_pin, GPIO_MODE_OUTPUT);
+    gpio_set_level(reset_pin, 0);
+    vTaskDelay(150 / portTICK_PERIOD_MS);
+    gpio_set_level(reset_pin, 1);
+    vTaskDelay(150 / portTICK_PERIOD_MS);
+    
     // First startup initalization
     esp_err_t err = ESP_OK;
     uint8_t tmp = 0;
@@ -83,16 +91,18 @@ void reader_init() {
         ESP_LOGI(TAG, "Initialized (firmware v%d.0)", (tmp & 0x03));
 
 
+
     // Setup GPIO service
     ESP_LOGI(TAG, "Initializing IRQ Pin Service");
     gpio_config_t io_conf;
     io_conf.intr_type = GPIO_INTR_POSEDGE;
     io_conf.pin_bit_mask = (1ULL << irq_pin);
     io_conf.mode = GPIO_MODE_INPUT;
-    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
-    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    io_conf.pull_down_en = GPIO_PULLDOWN_ENABLE;
     gpio_config(&io_conf);
     gpio_install_isr_service(0);
+    gpio_isr_handler_add(irq_pin, cb, NULL);
 
 
     // Enable interrupt config on the reader
@@ -122,10 +132,6 @@ void reader_read_sector(char* data, int sector) {
 uint8_t reader_is_magic_card() {
     return 0;
 };
-
-void reader_irq_handler(void(*cb)(void*arg)) {
-    gpio_isr_handler_add(irq_pin, cb, NULL);
-}
 
 // Alias for global usage
 esp_err_t reader_read_reg_read(uint8_t reg, uint8_t *data) {

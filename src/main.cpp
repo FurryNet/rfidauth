@@ -30,8 +30,7 @@ extern "C" {
         i2c_setup();
         display_init();
         spi_setup();
-        reader_init();
-        reader_irq_handler(cb_func);
+        reader_init(cb_func);
 
         ESP_LOGI("SYS", "Starting Script...");
         display_write_page("DEV Ver: ", 0);
